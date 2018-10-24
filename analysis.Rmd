@@ -1,0 +1,60 @@
+---
+title: "Analysis"
+author: "Adam Czepielik"
+date: "October 24, 2018"
+output: html_document
+---
+
+```{r}
+library(jsonlite)
+
+extract <- function(file){
+  one <- fromJSON(file)
+  tstamp <- as.POSIXct(one$time/1000, origin = "1970-01-01 00:00:00")
+  records <- cbind(tstamp, one$teams)
+}
+
+files <- list.files(pattern = "*.json")
+data <- lapply(files, extract)
+
+data <- do.call(rbind, data)
+```
+
+```{r}
+library(ggplot2)
+library(dplyr)
+
+data %>% 
+ggplot(aes(tstamp, laps, color = name)) + geom_line()
+```
+
+```{r}
+ahead <- function(team1, team2){
+  data %>% 
+    filter(name %in% c(team1, team2)) %>% 
+    select(tstamp, name, laps, position) %>% 
+    transmute(tstamp, name = factor(name, levels = c(team1, team2)), result = laps + position) %>% 
+    unique() %>% spread(name, result) %>% 
+    transmute(tstamp, difference = .[[2]] - .[[3]]) %>% 
+    ggplot(aes(tstamp, difference)) + geom_line(aes(color = difference > 0), size = 1) + 
+    geom_hline(aes(yintercept = 0), size = 1.5) + labs(title = paste(team1, "vs.", team2))
+}
+
+ahead('VTK', 'Apolloon')
+ahead("LBK", "Viva Ekonomika")
+ahead("Medica", "Industria")
+ahead("Tripel Hop", "Atmosphere")
+```
+
+```{r}
+speed <- function(teams){
+  data %>% filter(name %in% teams) %>% 
+    ggplot(aes(tstamp, speed, color = name)) + geom_smooth()
+}
+
+speed(c("VTK", "Apolloon"))
+speed(c("LBK", "Viva Ekonomika"))
+speed(c("Medica", "Industria"))
+speed(unique(data$name))
+```
+
